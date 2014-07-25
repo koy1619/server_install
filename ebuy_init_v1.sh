@@ -75,7 +75,10 @@ sed '/# End of file/i\*        soft    nofile          65535\n*        hard    n
 fi
 
 ## sys sshd
-
+#cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+#sed -i s/'#Port 22'/'Port 8022'/g /etc/ssh/sshd_config
+#sed -i s/'#PermitRootLogin yes'/'PermitRootLogin no'/g /etc/ssh/sshd_config
+#/etc/init.d/sshd restart
 
 ## ntp update
 cat > /var/spool/cron/root <<EOFF
