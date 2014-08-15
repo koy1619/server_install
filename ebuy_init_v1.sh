@@ -18,6 +18,9 @@ hostip=`ifconfig|egrep "'inet addr'|Bcast"|head -n 1 |awk '{print $2}'|awk -F ":
 sed -i '/HOSTNAME/d' /etc/sysconfig/network && echo "HOSTNAME=$hostip">>/etc/sysconfig/network
 hostname $hostip
 
+## user&group
+useradd ebuy
+useradd zabbix
 
 ## DNS
 cat >/etc/resolv.conf <<EOFF
@@ -74,6 +77,9 @@ then
 sed '/# End of file/i\*        soft    nofile          65535\n*        hard    nofile          65535' -i /etc/security/limits.conf
 fi
 
+
+##user add
+#
 ## sys sshd
 #cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 #sed -i s/'#Port 22'/'Port 8022'/g /etc/ssh/sshd_config
