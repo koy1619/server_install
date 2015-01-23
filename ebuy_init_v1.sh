@@ -24,9 +24,10 @@ useradd zabbix
 
 ## DNS
 cat >/etc/resolv.conf <<EOFF
-nameserver 202.96.209.133
+nameserver 223.5.5.5
+nameserver 223.6.6.6
+nameserver 114.114.114.114
 nameserver 202.96.209.5
-nameserver 8.8.8.8
 EOFF
 
 ## mirror
@@ -88,7 +89,7 @@ fi
 
 ## ntp update
 cat > /var/spool/cron/root <<EOFF
-00 23 * * *  /usr/sbin/ntpdate 192.168.2.56 >> /root/ntp.log 2>&1;/sbin/hwclock -w
+*/10 * * * * /usr/sbin/ntpdate -s 192.168.2.56  &&  /sbin/hwclock -w 
 EOFF
 /etc/init.d/crond restart
 
