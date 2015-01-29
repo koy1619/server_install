@@ -76,6 +76,7 @@ fi
 if [ `grep '65535' /etc/security/limits.conf|wc -l` -eq 0 ]
 then
 sed '/# End of file/i\*        soft    nofile          65535\n*        hard    nofile          65535' -i /etc/security/limits.conf
+sed -i s/'*          soft    nproc     1024'/'*          soft    nproc     10240'/g  /etc/security/limits.d/90-nproc.conf
 fi
 
 
