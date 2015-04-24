@@ -1,0 +1,429 @@
+一，准备工作
+
+下载mysql和相关应用包
+cd /
+mkdir setup
+
+mkdir /setup/mysql
+
+#mysql主程序
+#64位操作系统请先安装 libunwind库，32位操作系统不要安装。libunwind库为基于64位CPU和操作系统的程序提供了基本的堆栈辗转开解功能，其中包括用于输出堆栈跟踪的API、用于以编程方式辗转开解堆栈的API以及支持C++异常处理机制的API
+wget http://mirror.yongbok.net/nongnu/libunwind/libunwind-1.0.1.tar.gz
+wget http://gperftools.googlecode.com/files/gperftools-2.0.tar.gz
+wget http://downloads.mysql.com/archives/mysql-5.5/mysql-5.5.25.tar.gz
+#CMake是一个跨平台的安装(编译)工具,可以用简单的语句来描述所有平台的安装(编译过程)
+wget http://www.cmake.org/files/v2.8/cmake-2.8.8.tar.gz
+
+下载nginx和相关应用包
+mkdir /setup/nginx
+cd /setup/nginx
+wget http://sourceforge.net/projects/pcre/files/pcre/8.30/pcre-8.30.tar.bz2/download
+wget http://nginx.org/download/nginx-1.2.0.tar.gz
+
+下载php和相关应用包
+mkdir /setup/php
+cd /setup/php
+
+#字符转换库libiconv
+wget http://sourceforge.net/projects/mcrypt/files/Libmcrypt/2.5.8/libmcrypt-2.5.8.tar.bz2/download
+wget http://sourceforge.net/projects/mcrypt/files/MCrypt/2.6.8/mcrypt-2.6.8.tar.gz/download
+wget http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
+#php5-mail-header.patch为php被丁，有助于防止邮件发送被滥用
+wget http://www.lancs.ac.uk/~steveb/patches/php-mail-header-patch/php5-mail-header.patch
+
+#将eaccelerator换成xcache(xcache 2.0支持php 5.4)
+wget http://sourceforge.net/projects/mhash/files/mhash/0.9.9.9/mhash-0.9.9.9.tar.bz2/download
+wget http://xcache.lighttpd.net/pub/Releases/2.0.0/xcache-2.0.0.tar.gz
+
+#memcached缓存
+wget https://github.com/downloads/libevent/libevent/libevent-2.0.19-stable.tar.gz
+wget http://memcached.googlecode.com/files/memcached-1.4.13.tar.gz
+
+#PHP的memcache扩展
+wget http://pecl.php.net/get/memcache-3.0.6.tgz
+wget http://pecl.php.net/get/memcached-2.0.1.tgz
+wget https://launchpad.net/libmemcached/1.0/1.0.8/+download/libmemcached-1.0.8.tar.gz
+
+#ImageMagick完美代替GB类库处理图像
+wget http://pecl.php.net/get/imagick-3.1.0RC1.tgz
+wget http://www.imagemagick.org/download/ImageMagick.tar.gz
+wget http://downloads2.ioncube.com/loader_downloads/ioncube_loaders_lin_x86.tar.bz2
+
+#php主程序
+wget http://cn.php.net/get/php-5.4.0.tar.bz2/from/this/mirror
+
+开始啦...................................
+yum makecache
+yum -y install gcc gcc-c++ bison patch unzip mlocate flex wget automake autoconf gd cpp gettext readline-devel libjpeg libjpeg-devel libpng libpng-devel freetype freetype-devel libxml2 libxml2-devel zlib zlib-devel glibc glibc-devel glib2 glib2-devel bzip2 bzip2-devel ncurses ncurses-devel curl curl-devel e2fsprogs e2fsprogs-devel libidn libidn-devel openldap openldap-devel openldap-clients openldap-servers nss_ldap expat-devel libtool libtool-ltdl-devel bison lsof openssh-clientsopenssl-devel ntpdate
+
+更新校准系统时间 
+yum install ntpdate
+/usr/sbin/ntpdate cn.pool.ntp.org
+
+
+二，LANMP安装配置（nginx、php整合等）
+
+1.安装mysql
+
+   #============= Install Mysql ===================#
+  
+tar -zxvf libunwind-1.0.1.tar.gz
+cd libunwind-1.0.1
+./configure
+make
+make install
+cd ..
+  
+tar -zxvf gperftools-2.0.tar.gz
+cd gperftools-2.0
+./configure
+make
+make install
+echo "/usr/local/lib" > /etc/ld.so.conf.d/usr_local_lib.conf
+/sbin/ldconfig
+cd ..
+  
+tar -zxvf cmake-2.8.8.tar.gz
+cd cmake-2.8.8
+./bootstrap
+gmake
+gmake install
+cd ..
+  
+/usr/sbin/groupadd mysql
+/usr/sbin/useradd -g mysql mysql -s /sbin/nologin
+mkdir -p /data/mysql/{data,binlog,relaylog,mysql}
+chown -R mysql:mysql /data/mysql
+  
+tar zxvf mysql-5.5.25.tar.gz
+cd mysql-5.5.25
+rm -rf CMakeCache.txt
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local/mysql -DMYSQL_UNIX_ADDR=/data/mysql/mysql.sock -DDEFAULT_CHARSET=utf8 -DDEFAULT_COLLATION=utf8_general_ci -DEXTRA_CHARSETS=all -DWITH_MYISAM_STORAGE_ENGINE=1 -DWITH_INNOBASE_STORAGE_ENGINE=1 -DWITH_READLINE=1 -DENABLED_LOCAL_INFILE=1 -DMYSQL_DATADIR=/data/mysql/data -DMYSQL_TCP_PORT=3306
+make
+make install
+
+chmod +w /usr/local/mysql
+chown -R mysql:mysql /usr/local/mysql
+ln -s /usr/local/mysql/lib/libmysqlclient.so.18 /usr/lib/libmysqlclient.so.18
+/usr/local/mysql/scripts/mysql_install_db --basedir=/usr/local/mysql --datadir=/data/mysql/data --user=mysql
+sed -i '/# executing mysqld_safe/a\export LD_PRELOAD=/usr/local/lib/libtcmalloc.so' /usr/local/mysql/bin/mysqld_safe
+cp support-files/mysql.server /etc/rc.d/init.d/mysqld
+sed -i '46 s#basedir=#basedir=/usr/local/mysql#'  /etc/rc.d/init.d/mysqld
+sed -i '47 s#datadir=#datadir=/data/mysql/data#'  /etc/rc.d/init.d/mysqld
+chmod 700 /etc/rc.d/init.d/mysqld
+cp /usr/local/mysql/support-files/my-medium.cnf /etc/my.cnf
+service mysqld restart
+/usr/sbin/lsof -n | grep tcmalloc
+/sbin/chkconfig --add mysqld
+/sbin/chkconfig --level 2345 mysqld on
+ln -s /usr/local/mysql/bin/mysql /usr/bin/mysql
+ln -s /usr/local/mysql/bin/mysqladmin /usr/bin/mysqladmin
+ln -s /usr/local/mysql/bin/mysqldump /usr/bin/mysqldump
+mysqladmin -u root password 123456
+echo "/usr/local/mysql/lib/mysql" >> /etc/ld.so.conf
+/sbin/ldconfig
+echo "export PATH=$PATH:/usr/local/mysql/bin" >> /etc/profile
+source /etc/profile
+
+
+
+
+#============= Install Nginx ===================#
+
+
+
+/usr/sbin/groupadd www
+/usr/sbin/useradd -g www www -s /sbin/nologin
+
+tar -jxvf pcre-8.30.tar.bz2
+cd pcre-8.30
+./configure --prefix=/usr/local/pcre
+make
+make install
+cd ..
+
+tar -zxvf nginx-1.2.0.tar.gz
+cd nginx-1.2.0
+./configure --user=www --group=www --prefix=/usr/local/nginx --with-pcre=/setup/nginx/pcre-8.30 --with-http_stub_status_module --with-http_ssl_module --with-http_flv_module --with-http_gzip_static_module --with-google_perftools_module
+make
+make install
+
+vi /etc/init.d/nginx  （插入nginx启动脚本）
+chmod 700 /etc/init.d/nginx
+service nginx restart
+/sbin/chkconfig --add nginx
+/sbin/chkconfig --level 2345 nginx on
+
+
+ 
+ 
+#============= Install PHP ===================#
+
+
+tar -zxvf libiconv-1.14.tar.gz
+cd libiconv-1.14
+./configure
+make
+make install
+cd ..
+ 
+tar -jvxf  libmcrypt-2.5.8.tar.bz2
+cd libmcrypt-2.5.8
+./configure
+make
+make install
+/sbin/ldconfig
+ cd libltdl/
+./configure --enable-ltdl-install
+make
+make install
+ 
+
+cd ../..
+tar -jvxf mhash-0.9.9.9.tar.bz2
+cd mhash-0.9.9.9
+./configure
+make
+make install
+ln -s /usr/local/lib/libmcrypt.la /usr/lib/libmcrypt.la
+ln -s /usr/local/lib/libmcrypt.so /usr/lib/libmcrypt.so
+ln -s /usr/local/lib/libmcrypt.so.4 /usr/lib/libmcrypt.so.4
+ln -s /usr/local/lib/libmcrypt.so.4.4.8 /usr/lib/libmcrypt.so.4.4.8
+ln -s /usr/local/lib/libmhash.a /usr/lib/libmhash.a
+ln -s /usr/local/lib/libmhash.la /usr/lib/libmhash.la
+ln -s /usr/local/lib/libmhash.so /usr/lib/libmhash.so
+ln -s /usr/local/lib/libmhash.so.2 /usr/lib/libmhash.so.2
+ln -s /usr/local/lib/libmhash.so.2.0.1 /usr/lib/libmhash.so.2.0.1
+cd ..
+
+tar -zxvf mcrypt-2.6.8.tar.gz
+cd mcrypt-2.6.8
+/sbin/ldconfig
+./configure
+make
+make install
+cd ..
+
+tar -jxvf php-5.3.8.tar.bz2
+patch -d php-5.3.8 -p1 < php5-mail-header.patch
+cd php-5.4.0
+./configure --prefix=/usr/local/php --with-config-file-path=/usr/local/php/etc  --with-mysql=/app/mysql --with-mysqli=/app/mysql/bin/mysql_config --with-iconv-dir=/usr/local --enable-fpm --disable-debug --enable-safe-mode --with-freetype-dir --with-jpeg-dir --with-png-dir --with-zlib --with-libxml-dir=/usr --enable-xml --disable-rpath --enable-bcmath --enable-shmop --enable-sysvsem --enable-inline-optimization --with-curl --with-curlwrappers --enable-mbregex --enable-mbstring --with-mcrypt --with-gd --enable-gd-native-ttf --with-openssl --with-mhash --enable-pcntl --enable-sockets --with-xmlrpc --enable-zip --enable-soap --with-gettext --with-apxs2=/usr/local/apache/bin/apxs
+make ZEND_EXTRA_LIBS='-liconv'
+make test
+make install
+
+php-fpm的启动：
+cp php.ini-production /usr/local/php/etc/php.ini
+cp -R ./sapi/fpm/php-fpm.conf /usr/local/php/etc/php-fpm.conf
+vi /usr/local/php/etc/php-fpm.conf
+pid = run/php-fpm.pid 改为 pid = /usr/local/php/var/run/php-fpm.pid  #启动脚本必须路径，取消注释#
+cp -R ./sapi/fpm/init.d.php-fpm /etc/init.d/php-fpm
+chmod 755 /etc/init.d/php-fpm
+/sbin/chkconfig --add php-fpm
+/sbin/chkconfig php-fpm on
+service php-fpm restart
+ cd ..
+ 
+tar -xvf memcache-2.2.7.tar
+cd memcache-2.2.7/
+/usr/local/php/bin/phpize
+./configure --with-php-config=/usr/local/php/bin/php-config --with-zlib-dir --enable-memcache
+make
+make test
+make install
+cd ..
+ 
+tar -xzf libevent-2.0.19-stable.tar.gz
+cd libevent-2.0.19-stable
+./configure
+make
+make install
+ln -s /usr/local/lib/libevent-2.0.so.5 /usr/lib
+cd ..
+ 
+tar -zvxf  memcached-1.4.13.tar.gz
+cd memcached-1.4.13
+./configure --prefix=/usr/local/memcached --with-libevent=/usr
+make
+make install
+cd ..
+ 
+tar -zxvf libmemcached-1.0.8.tar.gz
+cd libmemcached-1.0.8
+./configure --prefix=/usr/local/libmemcached  --with-memcached
+make
+make install
+cd ..
+ 
+tar -xvf memcached-2.1.0.tar
+cd memcached-2.1.0
+/usr/local/php/bin/phpize
+./configure --enable-memcached --with-php-config=/usr/local/php/bin/php-config --with-libmemcached-dir=/usr/local/libmemcached --with-memcached --with-zlib
+make
+make test
+make install
+cd ..
+ 
+tar -zxvf xcache-2.0.0.tar.gz
+cd xcache-2.0.0
+/usr/local/php/bin/phpize
+./configure --with-php-config=/usr/local/php/bin/php-config
+make
+make test
+make install
+cd ..
+ 
+tar zxvf ImageMagick.tar.gz
+cd ImageMagick-6.7.8-0
+./configure --prefix=/usr/local/imagemagick
+make
+make install
+cd ..
+ 
+tar -zxvf imagick-3.1.0RC1.tgz
+cd imagick-3.1.0RC1/
+export  PKG_CONFIG_PATH=/usr/local/imagemagick/lib/pkgconfig
+/usr/local/php/bin/phpize
+./configure --with-php-config=/usr/local/php/bin/php-config --with-imagick=/usr/local/imagemagick
+make
+make test
+make install
+cd ..
+
+cd $setup_dir/php
+tar zxvf eaccelerator-eaccelerator-42067ac.tar.gz
+cd eaccelerator-eaccelerator-42067ac
+/usr/local/php/bin/phpize
+./configure --enable-eaccelerator=shared --with-php-config=/usr/local/php/bin/php-config
+make
+make install
+mkdir -p /usr/local/eaccelerator_cache
+ 
+tar -zxvf  ioncube_loaders_lin_x86-64.tar.gz
+cd ioncube
+mkdir /usr/local/ioncube
+mv ioncube_loader_lin_5.4.so /usr/local/ioncube/
+sed -i '$a zend_extension="/usr/local/ioncube/ioncube_loader_lin_5.2.so"' /usr/local/php/etc/php.ini
+
+cd php-5.4.0/ext/pdo_mysql/
+/usr/local/php/bin/phpize 
+./configure --with-php-config=/usr/local/php/bin/php-config --with-pdo-mysql=/usr/local/mysql
+make
+make test
+make install
+cd ..
+
+sed -i 's#; extension_dir = "./"#extension_dir = "/usr/local/php/lib/php/extensions/no-debug-non-zts-20090626/"\nextension = "memcache.so"\nextension = "pdo_mysql.so"\nextension = "memcached.so"\nextension = "imagick.so"\n#' /usr/local/php/etc/php.ini
+
+
+
+#=============JDK安装=============#     
+先卸载之前的java
+ tar zxvf jdk-7u9-linux-x64.tar.gz
+mv jdk1.7.0_09/ /usr/local/jdk
+cd /usr/local/jdk/
+printf 'export JAVA_HOME=/usr/local/jdk/\nexport CLASSPATH=.:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar\nexport PATH=$PATH:$JAVA_HOME/bin' >> /etc/profile
+source /etc/profile
+java -version
+
+#==============check================#
+netstat -nat
+ps aux |grep nginx
+
+===================FAQ======================
+yum -y install openssh-clients  （scp安装需要，centos最简安装不带）
+
+
+PHP
+vi /usr/local/php/etc/php.ini
+date.timezone = Asia/Shanghai
+
+error_reporting = E_ALL & ~E_NOTICE
+
+关于php5.2.17的BI打开No input file specified.问题
+默认cgi.fix_pathinfo=0
+注释掉;cgi.fix_pathinfo=0
+
+
+ibdata不断增大问题
+[mysqld]
+innodb_file_per_table=1
+查看
+mysql> show variables like '%per_table%';
++-----------------------+-------+
+| Variable_name         | Value |
++-----------------------+-------+
+| innodb_file_per_table | ON    |
++-----------------------+-------+
+1 row in set (0.00 sec)
+
+查看慢查询log
+mysql> show variables like 'log_slow_queries';
++------------------+-------+
+| Variable_name    | Value |
++------------------+-------+
+| log_slow_queries | OFF   |
++------------------+-------+
+1 row in set (0.00 sec)
+mysql> set global log_slow_queries=on;
+mysql> set global slow_query_log_file='/data/mysql/mysql.slow.log';
+mysql> set global long_query_time=1;
+
+
+expire_logs_days = 7
+
+
+# 重启事件
+show variables like '%event_scheduler%';
+set GLOBAL event_scheduler=ON;
+
+
+----------------------------------------------------------------------------------------------------
+MySQL创建Function时报的1418错误代号解决办法
+http://hi.baidu.com/sue_spring/item/bd10ddcca8145dd3964452b9
+
+ErrorCode:1418
+ThisfunctionhasnoneofDETERMINISTIC,NOSQL,orREADSSQLDATAinitsdeclarationandbinaryloggingisenabled(you*might*wanttousethelesssafelog_bin_trust_function_creatorsvariable)
+(0mstaken)
+
+　　解决方法如下：
+
+　　1. mysql> SET GLOBAL log_bin_trust_function_creators = 1;
+
+　　2. 系统启动时 --log-bin-trust-function-creators=1
+
+　　3. 在my.ini(linux下为my.conf)文件中 [mysqld] 标记后加一行内容为 log-bin-trust-function-creators
+
+
+
+
+====================================================
+libmemcached编译错误：
+libmemcached/auto.cc: In function 'memcached_return_t text_incr_decr(memcached_server_st*, bool, const char*, size_t, uint64_t, bool)':
+libmemcached/auto.cc:73: error: expected `)' before 'PRIu64'
+
+In file included from ./libmemcached/common.h:72,
+                 from ./libmemcached/csl/common.h:40,
+                 from libmemcached/csl/context.cc:38:
+./libmemcached-1.0/memcached.h:46:27: error: tr1/cinttypes: No such file or directory
+
+对策：libmemcached-1.0.2 版本以上升级编译器版本
+# yum install gcc44 gcc44-c++ libstdc++44-devel
+
+# export CC=/usr/bin/gcc44
+# export CXX=/usr/bin/g++44
+# ./configure
+
+================================================================
+
+果你的配置文件使用了类似my-innodb-heavy-4G.cnf作为配置文件的话。 
+Mysql可以正常启动，但innodb的表无法使用 
+在错误日志里你会看到如下输出： 
+
+InnoDB: Error: log file ./ib_logfile0 is of different size 0 5242880 bytes 
+
+现在需要做的事情就是把原来的 innodb 的ib_logfile×备份到一个目录下，然后删除掉原来的文件，重启 mysql。 
+你会看到ib_logfile*大小变成了你配置文件中指定的大小。 
+my-innodb-heavy-4G.cnf的话（log file 的大小是256M：innodb_log_file_size = 256M） 
+你会看到很多个268435456大小的文件。
+
