@@ -27,7 +27,7 @@ useradd zabbix
 cat >/etc/resolv.conf <<EOFF
 nameserver 223.5.5.5
 nameserver 223.6.6.6
-nameserver 114.114.114.114
+nameserver 202.96.209.133
 nameserver 202.96.209.5
 EOFF
 
