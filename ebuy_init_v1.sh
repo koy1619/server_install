@@ -1,5 +1,6 @@
 
 #!/bin/sh
+##server_install_zh
 #init-package 20140724 by bughe
 
 echo -e "\033[32;40;1m Start Init System.Please wait...\033[0m "
